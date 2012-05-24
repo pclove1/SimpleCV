@@ -877,4 +877,117 @@ class JpegStreamCamera(FrameSource):
         return Image(pil.open(StringIO(self.camthread.currentframe)), self)
 
 
+class StereoCamera:
+    """
+    **SUMMARY**
+    
+    This class is for stereo camera. (More clarification is needed!)
 
+    """
+
+    def findFundamentalMat(self, img1, img2, thresh=500.00, minDist=0.15):
+        """
+        **SUMMARY**        
+
+        This method returns the fundamental matrix F such that (P_2).T F P_1 = 0
+
+        **PARAMETERS**
+
+        * *thresh* - The feature quality metric. This can be any value between about 300 and 500. Higher
+          values should return fewer, but higher quality features. 
+        * *minDist* - The value below which the feature correspondence is considered a match. This 
+          is the distance between two feature vectors. Good values are between 0.05 and 0.3
+
+        **RETURNS**   
+     
+        Return None if it fails.
+        * *F* -  Fundamental matrix as ndarray. 
+        * *matched_pts1* - the matched points (x, y) in img1
+        * *matched_pts2* - the matched points (x, y) in img2
+
+        **EXAMPLE**
+        >>> img1 = Image("sampleimages/stereo_view1.png")
+        >>> img2 = Image("sampleimages/stereo_view2.png")
+        >>> cam = StereoCamera()
+        >>> F = cam.findFundamentalMat(img1, img2)
+        """
+        
+        if img1.size() != img2.size():
+            logger.warning("img1 and img2 should have the same size.");
+
+        kpts1, desc1 = img1._getRawKeypoints(thresh)
+        kpts2, desc2 = img2._getRawKeypoints(thresh)
+
+        if( desc1 == None or desc2 == None ):
+            logger.warning("We didn't get any descriptors. Image might be too uniform or blurry." )
+            return None
+        
+        num_pts1 = desc1.shape[0]
+        num_pts2 = desc2.shape[0]
+
+        magic_ratio = 1.00
+        if num_pts1 > num_pts2:
+            magic_ratio = float(num_pts1)/float(num_pts2)
+
+        # match our keypoint descriptors
+        idx, dist = Image()._getFLANNMatches(desc1, desc2) 
+        p = dist.squeeze()
+        result = p*magic_ratio < minDist
+
+        try:
+            import cv2
+        except:
+            logger.warning("Can't use fundamental matrix without OpenCV >= 2.3.0")
+            return None 
+
+        pts1 = np.array([ kpt.pt for kpt in kpts1 ])
+        pts2 = np.array([ kpt.pt for kpt in kpts2 ])
+
+        matched_pts1 = pts1[idx[result]].squeeze()
+        matched_pts2 = pts2[result]
+
+        F, mask = cv2.findFundamentalMat(matched_pts1, matched_pts2, method=cv.CV_FM_LMEDS)
+
+        inlier_ind = mask.nonzero()[0]
+        matched_pts1 = matched_pts1[inlier_ind,:]
+        matched_pts2 = matched_pts2[inlier_ind,:]
+
+        # flip the coordinate, since OpenCV seems to use (y, x) coordinate.
+        matched_pts1 = matched_pts1[:, ::-1]
+        matched_pts2 = matched_pts2[:, ::-1]
+        return F, matched_pts1, matched_pts2
+
+class StereoMapper:
+    def eline(self, point, whichImage, F):
+        """
+        **SUMMARY**    
+    
+        This method returns the epipolar line [a, b, c]
+
+        **PARAMETERS**
+
+        * *point* - Input point (x, y)
+        * *whichImage* - Index of the image (1 or 2) that contains the point
+        * *F* - Fundamental matrix that can be estimated 
+                using StereoCamera.findFundamentalMat()
+
+        **RETURNS**        
+
+        epipolar line as ndarray. 
+
+        **EXAMPLE**
+
+        >>> mapper = StereoMapper()
+        >>> epiline = mapper.Eline(point, 1, F)
+        """
+
+        pt_cvmat = cv.CreateMat(1, 1, cv.CV_32FC2)
+        pt_cvmat[0, 0] = (point[1], point[0]) # OpenCV seems to use (y, x) coordinate.
+        line = cv.CreateMat(1, 1, cv.CV_32FC3)
+        cv.ComputeCorrespondEpilines(pt_cvmat, whichImage, npArray2cvMat(F), line)
+
+        # flip the coordinate, since OpenCV seems to use (y, x) coordinate.
+        line_npArray = np.array(line).squeeze()
+        line_npArray = line_npArray[[1, 0, 2]]
+
+        return line_npArray
