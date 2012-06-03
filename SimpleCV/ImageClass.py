@@ -30,7 +30,7 @@ class ColorSpace:
     HLS = 4
     HSV = 5
     XYZ  = 6
-
+    YCrCb = 7
   
 class ImageSet(list):
     """
@@ -947,6 +947,28 @@ class Image:
         """
         return(self._colorSpace==ColorSpace.GRAY)    
 
+    def isYCrCb(self):
+        """
+        **SUMMARY**
+
+        Returns true if this image uses the YCrCb colorspace.
+        
+        **RETURNS**
+
+        True if the image uses the YCrCb colorspace, False otherwise. 
+        
+        **EXAMPLE**
+        
+        >>> if( img.isYCrCb() ):
+        >>>    Y,Cr,Cb = img.splitChannels()
+
+        **SEE ALSO**
+
+        :py:meth:`toYCrCb`
+        
+        """
+        return(self._colorSpace==ColorSpace.YCrCb)
+    
     def toRGB(self):
         """
         **SUMMARY**
@@ -980,6 +1002,8 @@ class Image:
             cv.CvtColor(self.getBitmap(), retVal, cv.CV_HLS2RGB)    
         elif( self._colorSpace == ColorSpace.XYZ ):
             cv.CvtColor(self.getBitmap(), retVal, cv.CV_XYZ2RGB)
+        elif( self._colorSpace == ColorSpace.YCrCb ):
+            cv.CvtColor(self.getBitmap(), retVal, cv.CV_YCrCb2RGB)    
         elif( self._colorSpace == ColorSpace.RGB ):
             retVal = self.getBitmap()
         else:
@@ -1020,6 +1044,8 @@ class Image:
             cv.CvtColor(self.getBitmap(), retVal, cv.CV_HLS2BGR)    
         elif( self._colorSpace == ColorSpace.XYZ ):
             cv.CvtColor(self.getBitmap(), retVal, cv.CV_XYZ2BGR)
+        elif( self._colorSpace == ColorSpace.YCrCb ):
+            cv.CvtColor(self.getBitmap(), retVal, cv.CV_YCrCb2BGR)    
         elif( self._colorSpace == ColorSpace.BGR ):
             retVal = self.getBitmap()    
         else:
@@ -1063,6 +1089,9 @@ class Image:
         elif( self._colorSpace == ColorSpace.XYZ ):
             cv.CvtColor(self.getBitmap(), retVal, cv.CV_XYZ2RGB)
             cv.CvtColor(retVal, retVal, cv.CV_RGB2HLS)
+        elif( self._colorSpace == ColorSpace.YCrCb ):
+            cv.CvtColor(self.getBitmap(), retVal, cv.CV_YCrCb2RGB)
+            cv.CvtColor(retVal, retVal, cv.CV_RGB2HLS)        
         elif( self._colorSpace == ColorSpace.HLS ):
             retVal = self.getBitmap()      
         else:
@@ -1105,6 +1134,9 @@ class Image:
         elif( self._colorSpace == ColorSpace.XYZ ):
             cv.CvtColor(self.getBitmap(), retVal, cv.CV_XYZ2RGB)
             cv.CvtColor(retVal, retVal, cv.CV_RGB2HSV)
+        elif( self._colorSpace == ColorSpace.YCrCb ):
+            cv.CvtColor(self.getBitmap(), retVal, cv.CV_YCrCb2RGB)
+            cv.CvtColor(retVal, retVal, cv.CV_RGB2HSV)        
         elif( self._colorSpace == ColorSpace.HSV ):
             retVal = self.getBitmap()      
         else:
@@ -1148,6 +1180,9 @@ class Image:
         elif( self._colorSpace == ColorSpace.HSV ):
             cv.CvtColor(self.getBitmap(), retVal, cv.CV_HSV2RGB)
             cv.CvtColor(retVal, retVal, cv.CV_RGB2XYZ)
+        elif( self._colorSpace == ColorSpace.YCrCb ):
+            cv.CvtColor(self.getBitmap(), retVal, cv.CV_YCrCb2RGB)
+            cv.CvtColor(retVal, retVal, cv.CV_RGB2XYZ)            
         elif( self._colorSpace == ColorSpace.XYZ ):
             retVal = self.getBitmap()      
         else:
@@ -1181,7 +1216,7 @@ class Image:
 
         retVal = self.getEmpty(1)
         if( self._colorSpace == ColorSpace.BGR or
-                self._colorSpace == ColorSpace.UNKNOWN ):
+            	self._colorSpace == ColorSpace.UNKNOWN ):
             cv.CvtColor(self.getBitmap(), retVal, cv.CV_BGR2GRAY)
         elif( self._colorSpace == ColorSpace.RGB):
             cv.CvtColor(self.getBitmap(), retVal, cv.CV_RGB2GRAY)
@@ -1193,11 +1228,61 @@ class Image:
             cv.CvtColor(retVal, retVal, cv.CV_RGB2GRAY)
         elif( self._colorSpace == ColorSpace.XYZ ):
             cv.CvtColor(self.getBitmap(), retVal, cv.CV_XYZ2RGB)
-            cv.CvtColor(retVal, retVal, cv.CV_RGB2GRAY)  
+            cv.CvtColor(retVal, retVal, cv.CV_RGB2GRAY)
+        elif( self._colorSpace == ColorSpace.YCrCb ):
+            cv.CvtColor(self.getBitmap(), retVal, cv.CV_YCrCb2RGB)
+            cv.CvtColor(retVal, retVal, cv.CV_RGB2GRAY)        
+        elif( self._colorSpace == ColorSpace.GRAY ):
+            retVal = self.getBitmap()
         else:
             logger.warning("Image.toGray: There is no supported conversion to gray colorspace")
             return None
-        return Image(retVal, colorSpace = ColorSpace.GRAY )    
+        return Image(retVal, colorSpace = ColorSpace.GRAY )   
+        
+    def toYCrCb(self):
+        """
+        **SUMMARY**
+
+        This method attemps to convert the image to the YCrCb colorspace. 
+        If the color space is unknown we assume it is in the BGR format
+        
+        **RETURNS**
+
+        Returns the converted image if the conversion was successful, 
+        otherwise None is returned.
+        
+        **EXAMPLE**
+        
+        >>> img = Image("lenna")
+        >>> RGBImg = img.toYCrCb()
+
+        **SEE ALSO**
+
+        :py:meth:`isYCrCb`
+        
+        """
+
+        retVal = self.getEmpty()
+        if( self._colorSpace == ColorSpace.BGR or
+                self._colorSpace == ColorSpace.UNKNOWN ):
+            cv.CvtColor(self.getBitmap(), retVal, cv.CV_BGR2YCrCb)
+        elif( self._colorSpace == ColorSpace.RGB ):
+            cv.CvtColor(self.getBitmap(), retVal, cv.CV_RGB2YCrCb)
+        elif( self._colorSpace == ColorSpace.HSV ):
+            cv.CvtColor(self.getBitmap(), retVal, cv.CV_HSV2RGB)
+            cv.CvtColor(retVal, retVal, cv.CV_RGB2YCrCb)
+        elif( self._colorSpace == ColorSpace.HLS ):
+            cv.CvtColor(self.getBitmap(), retVal, cv.CV_HLS2RGB)
+            cv.CvtColor(retVal, retVal, cv.CV_RGB2YCrCb)    
+        elif( self._colorSpace == ColorSpace.XYZ ):
+            cv.CvtColor(self.getBitmap(), retVal, cv.CV_XYZ2RGB)
+            cv.CvtColor(retVal, retVal, cv.CV_RGB2YCrCb)
+        elif( self._colorSpace == ColorSpace.YCrCb ):
+            retVal = self.getBitmap()      
+        else:
+            logger.warning("Image.toYCrCb: There is no supported conversion to YCrCb colorspace")
+            return None
+        return Image(retVal, colorSpace=ColorSpace.YCrCb )     
     
     
     def getEmpty(self, channels = 3):
@@ -2635,7 +2720,10 @@ class Image:
         :py:class:`DrawingLayer`
 
         """
-        self.getDrawingLayer().circle((int(ctr[0]), int(ctr[1])), int(rad), color, int(thickness))
+        if( thickness < 0):
+            self.getDrawingLayer().circle((int(ctr[0]), int(ctr[1])), int(rad), color, int(thickness),filled=True)
+        else:
+            self.getDrawingLayer().circle((int(ctr[0]), int(ctr[1])), int(rad), color, int(thickness))
     
     
     def drawLine(self, pt1, pt2, color = (0, 0, 0), thickness = 1):
@@ -3649,64 +3737,17 @@ class Image:
             self.__dict__[k] = v
 
 
-    def findBarcode(self, zxing_path = ""):
+    def findBarcode(self):
         """
         **SUMMARY**
+        This function requires zbar and the zbar python wrapper to be installed.
 
-        If you have the python-zxing library installed, you can find 2d and 1d
-        barcodes in your image.  These are returned as Barcode feature objects
-        in a FeatureSet.  The single parameter is the ZXing_path, if you 
-        don't have the ZXING_LIBRARY env parameter set.
+        To install please visit:
+        http://zbar.sourceforge.net/
 
-        You can clone python-zxing at:
-
-        http://github.com/oostendo/python-zxing
-
-        **INSTALLING ZEBRA CROSSING**
-
-        * Download the latest version of zebra crossing from: http://code.google.com/p/zxing/
-      
-        * unpack the zip file where ever you see fit
-
-          >>> cd zxing-x.x, where x.x is the version number of zebra crossing 
-          >>> ant -f core/build.xml
-          >>> ant -f javase/build.xml 
+        On Ubuntu Linux 12.04 or greater:
+        sudo apt-get install python-zbar
         
-          This should build the library, but double check the readme
-        
-        * Get our helper library 
-
-          >>> git clone git://github.com/oostendo/python-zxing.git
-          >>> cd python-zxing
-          >>> python setup.py install
-
-        * Our library does not have a setup file. You will need to add
-           it to your path variables. On OSX/Linux use a text editor to modify your shell file (e.g. .bashrc)
-        
-          export ZXING_LIBRARY=<FULL PATH OF ZXING LIBRARY - (i.e. step 2)>
-          for example: 
-
-          export ZXING_LIBRARY=/my/install/path/zxing-x.x/   
-        
-          On windows you will need to add these same variables to the system variable, e.g.
-          
-          http://www.computerhope.com/issues/ch000549.htm
-        
-        * On OSX/Linux source your shell rc file (e.g. source .bashrc). Windows users may need to restart.
-        
-        * Go grab some barcodes!
-
-        .. Warning::
-          Users on OSX may see the following error:
-          
-          RuntimeWarning: tmpnam is a potential security risk to your program        
-          
-          We are working to resolve this issue. For normal use this should not be a problem.
-
-        **PARAMETERS**
-        
-        * *zxing_path* - The path to lib zxing.
-            
         **Returns**
         
         A :py:class:`FeatureSet` of :py:class:`Barcode` objects. If no barcodes are detected the method returns None.
@@ -3724,26 +3765,38 @@ class Image:
         :py:class:`Barcode`
 
         """
-        if not ZXING_ENABLED:
-            logger.warning("Zebra Crossing (ZXing) Library not installed. Please see the release notes.")
-            return None
+        try:
+          import zbar
+        except:
+          logger.warning('The zbar library is not installed, please install to read barcodes')
+          return None
 
+        #configure zbar
+        scanner = zbar.ImageScanner()
+        scanner.parse_config('enable')
+        raw = self.getPIL().convert('L').tostring()
+        width = self.width
+        height = self.height
 
-        if (not self._barcodeReader):
-            if not zxing_path:
-                self._barcodeReader = zxing.BarCodeReader()
-            else:
-                self._barcodeReader = zxing.BarCodeReader(zxing_path)
+        # wrap image data
+        image = zbar.Image(width, height, 'Y800', raw)
 
+        # scan the image for barcodes
+        scanner.scan(image)
 
-        tmp_filename = os.tmpnam() + ".png"
-        self.save(tmp_filename)
-        barcode = self._barcodeReader.decode(tmp_filename)
-        os.unlink(tmp_filename)
+        barcode = None
+        # extract results
+        for symbol in image:
+            # do something useful with results
+            barcode = symbol
 
-
+        # clean up
+        del(image)
+        
         if barcode:
-            return Barcode(self, barcode)
+            f = Barcode(self, barcode)
+            return FeatureSet([f])
+            #~ return f
         else:
             return None
 
@@ -6174,7 +6227,7 @@ class Image:
         mapped = map(tuple, np.column_stack(compute))
         fs = FeatureSet()
         for location in mapped:
-            fs.append(TemplateMatch(self, template_image.getBitmap(), (location[1],location[0]), matches[location[0], location[1]]))
+            fs.append(TemplateMatch(self, template_image, (location[1],location[0]), matches[location[0], location[1]]))
 
         #cluster overlapping template matches 
         finalfs = FeatureSet()
@@ -9253,7 +9306,7 @@ class Image:
         if( mode ): # get the peak hue for an area
             h = src[roi[0]:roi[0]+roi[2],roi[1]:roi[1]+roi[3]].hueHistogram()
             myHue = np.argmax(h)
-            c = (float(myHue),float(255),float(255),float(0))
+            C = (float(myHue),float(255),float(255),float(0))
             cv.SetImageROI(dst,roi)
             cv.AddS(dst,c,dst)
             cv.ResetImageROI(dst)
@@ -9405,6 +9458,82 @@ class Image:
 
         return Image(retVal) 
                     
+    def edgeIntersections(self, pt0, pt1, width=1, canny1=0, canny2=100):
+        """
+        **SUMMARY** 
+        
+        Find the outermost intersection of a line segment and the edge image and return
+        a list of the intersection points. If no intersections are found the method returns
+        an empty list. 
+        
+        **PARAMETERS**
+        
+        * *pt0* - an (x,y) tuple of one point on the intersection line.
+        * *pt1* - an (x,y) tuple of the second point on the intersection line.
+        * *width* - the width of the line to use. This approach works better when
+                    for cases where the edges on an object are not always closed 
+                    and may have holes.
+        * *canny1* - the lower bound of the Canny edge detector parameters.
+        * *canny2* - the upper bound of the Canny edge detector parameters.
+
+        **RETURNS**
+        
+        A list of two (x,y) tuples or an empty list.
+
+        **EXAMPLE**
+
+        >>> img = Image("SimpleCV")
+        >>> a = (25,100)
+        >>> b = (225,110)
+        >>> pts = img.edgeIntersections(a,b,width=3)
+        >>> e = img.edges(0,100)
+        >>> e.drawLine(a,b,color=Color.RED)
+        >>> e.drawCircle(pts[0],10,color=Color.GREEN)
+        >>> e.drawCircle(pts[1],10,color=Color.GREEN)
+        >>> e.show()
+
+        img = Image("SimpleCV")
+        a = (25,100)
+        b = (225,100)
+        pts = img.edgeIntersections(a,b,width=3)
+        e = img.edges(0,100)
+        e.drawLine(a,b,color=Color.RED)
+        e.drawCircle(pts[0],10,color=Color.GREEN)
+        e.drawCircle(pts[1],10,color=Color.GREEN)
+        e.show()
+
+
+        """
+        w = abs(pt0[0]-pt1[0])
+        h = abs(pt0[1]-pt1[1])
+        x = np.min([pt0[0],pt1[0]])
+        y = np.min([pt0[1],pt1[1]])
+        if( w <= 0 ):
+            w = width
+            x = np.clip(x-(width/2),0,x-(width/2))
+        if( h <= 0 ):
+            h = width 
+            y = np.clip(y-(width/2),0,y-(width/2))
+        #got some corner cases to catch here
+        p0p = np.array([(pt0[0]-x,pt0[1]-y)])
+        p1p = np.array([(pt1[0]-x,pt1[1]-y)])
+        edges = self.crop(x,y,w,h)._getEdgeMap(canny1, canny2)
+        line = cv.CreateImage((w,h),cv.IPL_DEPTH_8U,1)
+        cv.Zero(line)
+        cv.Line(line,((pt0[0]-x),(pt0[1]-y)),((pt1[0]-x),(pt1[1]-y)),cv.Scalar(255.00),width,8)
+        cv.Mul(line,edges,line)
+        intersections = uint8(np.array(cv.GetMat(line)).transpose())
+        (xs,ys) = np.where(intersections==255)
+        points = zip(xs,ys)
+        if(len(points)==0):
+            return [None,None]
+        A = np.argmin(spsd.cdist(p0p,points,'cityblock'))
+        B = np.argmin(spsd.cdist(p1p,points,'cityblock'))
+        ptA = (xs[A]+x,ys[A]+y)
+        ptB = (xs[B]+x,ys[B]+y)
+        # we might actually want this to be list of all the points
+        return [ptA, ptB]          
+
     def __getstate__(self):
         return dict( size = self.size(), colorspace = self._colorSpace, image = self.applyLayers().getBitmap().tostring() )
         

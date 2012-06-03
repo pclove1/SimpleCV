@@ -286,7 +286,7 @@ class Barcode(Feature):
     """
     **SUMMARY**
 
-    The Barcode Feature wrappers the object returned by findBarcode(), a python-zxing object.
+    The Barcode Feature wrappers the object returned by findBarcode(), a zbar symbol
   
     * The x,y coordinate is the center of the code.
     * points represents the four boundary points of the feature.  Note: for QR codes, these points are the reference rectangls, and are quadrangular, rather than rectangular with other datamatrix types. 
@@ -299,13 +299,24 @@ class Barcode(Feature):
     data = ""
   
     #given a ZXing bar
-    def __init__(self, i, zxbc):
-        self.image = i 
-        points = copy(zxbc.points) # hopefully this is in tl clockwise order
-        super(Barcode, self).__init__(i, at_x, at_y,points)        
-        self.data = zxbc.data.rstrip()
-        self.points = copy(zxbc.points)
+    def __init__(self, i, zbsymbol):
+        self.image = i
 
+        locs = zbsymbol.location
+        if len(locs) > 4:
+          xs = [l[0] for l in locs]
+          ys = [l[1] for l in locs]
+          xmax = np.max(xs)
+          xmin = np.min(xs)
+          ymax = np.max(ys)
+          ymin = np.min(ys)
+          points = ((xmin, ymin),(xmin,ymax),(xmax, ymax),(xmax,ymin))
+        else:
+          points = copy(locs) # hopefully this is in tl clockwise order
+          
+        super(Barcode, self).__init__(i, 0, 0,points)        
+        self.data = zbsymbol.data
+        self.points = copy(points)
         numpoints = len(self.points)
         self.x = 0
         self.y = 0
@@ -467,7 +478,7 @@ class HaarFeature(Feature):
     def __getstate__(self):
         dict = self.__dict__.copy()
         del dict["classifier"]
-	return dict
+        return dict
               
       
     def meanColor(self):
@@ -604,7 +615,7 @@ class TemplateMatch(Feature):
     h = 0 
 
     def __init__(self, image, template, location, quality):
-        self.template_image = template
+        self.template_image = template # -- KAT - TRYING SOMETHING
         self.image = image
         self.quality = quality
         w = template.width
@@ -1345,12 +1356,16 @@ class KeypointMatch(Feature):
             if( p[1] < xmin ):
                 ymin = p[1]
 
- 
-        self.width = (xmax-xmin)
-        self.height = (ymax-ymin)
-        at_x = xmin + (self.width/2)
-        at_y = ymin + (self.height/2)
-        points = ((xmin,ymin),(xmin,ymax),(xmax,ymax),(xmax,ymin))  
+        width = (xmax-xmin)
+        height = (ymax-ymin)
+        at_x = xmin + (width/2)
+        at_y = ymin + (height/2)
+        #self.x = at_x
+        #self.y = at_y
+        points = [(xmin,ymin),(xmin,ymax),(xmax,ymax),(xmax,ymin)]  
+        #self._updateExtents()
+        #self.image = image
+        #points = 
         super(KeypointMatch, self).__init__(image, at_x, at_y, points)                                        
   
     def draw(self, color = Color.GREEN,width=1):
@@ -1400,8 +1415,8 @@ class KeypointMatch(Feature):
         rectangle.
         """
         TL = self.topLeftCorner()
-        raw = self.image.crop(TL[0],TL[0],self.width,self.height) # crop the minbouding rect
-        mask = Image((self.width,self.height))
+        raw = self.image.crop(TL[0],TL[0],self.width(),self.height()) # crop the minbouding rect
+        mask = Image((self.width(),self.height()))
         mask.dl().polygon(self._minRect,color=Color.WHITE,filled=TRUE)
         mask = mask.applyLayers()
         mask.blit(raw,(0,0),alpha=None,mask=mask) 
@@ -1427,8 +1442,8 @@ class KeypointMatch(Feature):
         """
         if( self._avgColor is None ):
             TL = self.topLeftCorner()
-            raw = self.image.crop(TL[0],TL[0],self.width,self.height) # crop the minbouding rect
-            mask = Image((self.width,self.height))
+            raw = self.image.crop(TL[0],TL[0],self.width(),self.height()) # crop the minbouding rect
+            mask = Image((self.width(),self.height()))
             mask.dl().polygon(self._minRect,color=Color.WHITE,filled=TRUE)
             mask = mask.applyLayers()
             retVal = cv.Avg(raw.getBitmap(),mask._getGrayscaleBitmap())
