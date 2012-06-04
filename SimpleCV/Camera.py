@@ -911,6 +911,10 @@ class StereoCamera:
         >>> img2 = Image("sampleimages/stereo_view2.png")
         >>> cam = StereoCamera()
         >>> F = cam.findFundamentalMat(img1, img2)
+
+        **NOTE**
+        If you deal with the fundamental matrix F directly, be aware of (P_2).T F P_1 = 0 
+        where P_2 and P_1 consist of (y, x, 1)
         """
         
         if img1.size() != img2.size():
@@ -958,6 +962,82 @@ class StereoCamera:
         matched_pts2 = matched_pts2[:, ::-1]
         return F, matched_pts1, matched_pts2
 
+    def findHomography(self, img1, img2, thresh=500.00, minDist=0.15):
+        """
+        **SUMMARY**        
+
+        This method returns the homography H such that P2 ~ H P1
+
+        **PARAMETERS**
+
+        * *thresh* - The feature quality metric. This can be any value between about 300 and 500. Higher
+          values should return fewer, but higher quality features. 
+        * *minDist* - The value below which the feature correspondence is considered a match. This 
+          is the distance between two feature vectors. Good values are between 0.05 and 0.3
+
+        **RETURNS**   
+     
+        Return None if it fails.
+        * *H* -  homography as ndarray. 
+        * *matched_pts1* - the matched points (x, y) in img1
+        * *matched_pts2* - the matched points (x, y) in img2
+
+        **EXAMPLE**
+        >>> img1 = Image("sampleimages/stereo_view1.png")
+        >>> img2 = Image("sampleimages/stereo_view2.png")
+        >>> cam = StereoCamera()
+        >>> H = cam.findHomography(img1, img2)
+
+        **NOTE**
+        If you deal with the homography H directly, be aware of P2 ~ H P1
+        where P2 and P1 consist of (y, x, 1)
+        """
+        
+        if img1.size() != img2.size():
+            logger.warning("img1 and img2 should have the same size.");
+
+        kpts1, desc1 = img1._getRawKeypoints(thresh)
+        kpts2, desc2 = img2._getRawKeypoints(thresh)
+
+        if( desc1 == None or desc2 == None ):
+            logger.warning("We didn't get any descriptors. Image might be too uniform or blurry." )
+            return None
+        
+        num_pts1 = desc1.shape[0]
+        num_pts2 = desc2.shape[0]
+
+        magic_ratio = 1.00
+        if num_pts1 > num_pts2:
+            magic_ratio = float(num_pts1)/float(num_pts2)
+
+        # match our keypoint descriptors
+        idx, dist = Image()._getFLANNMatches(desc1, desc2) 
+        p = dist.squeeze()
+        result = p*magic_ratio < minDist
+
+        try:
+            import cv2
+        except:
+            logger.warning("Can't use homography without OpenCV >= 2.3.0")
+            return None 
+
+        pts1 = np.array([ kpt.pt for kpt in kpts1 ])
+        pts2 = np.array([ kpt.pt for kpt in kpts2 ])
+
+        matched_pts1 = pts1[idx[result]].squeeze()
+        matched_pts2 = pts2[result]
+
+        H, mask = cv2.findHomography(matched_pts1, matched_pts2, method=cv.CV_LMEDS)
+
+        inlier_ind = mask.nonzero()[0]
+        matched_pts1 = matched_pts1[inlier_ind,:]
+        matched_pts2 = matched_pts2[inlier_ind,:]
+
+        # flip the coordinate, since OpenCV seems to use (y, x) coordinate.
+        matched_pts1 = matched_pts1[:, ::-1]
+        matched_pts2 = matched_pts2[:, ::-1]
+        return H, matched_pts1, matched_pts2
+
 class StereoMapper:
     def eline(self, point, whichImage, F):
         """
@@ -992,3 +1072,39 @@ class StereoMapper:
         line_npArray = line_npArray[[1, 0, 2]]
 
         return line_npArray
+
+    def projectPoint(self, point, whichImage, H):
+        """
+        **SUMMARY**    
+    
+        This method returns the corresponding point (x, y) 
+
+        **PARAMETERS**
+
+        * *point* - Input point (x, y)
+        * *whichImage* - Index of the image (1 or 2) that contains the point
+        * *H* - Homography that can be estimated 
+                using StereoCamera.findHomography()
+
+        **RETURNS**        
+
+        Corresponding point (x, y) as tuple
+
+        **EXAMPLE**
+
+        >>> mapper = StereoMapper()
+        >>> projectPoint = mapper.projectPoint(point, 1, H)
+        """
+        H = np.matrix(H)
+
+        # be aware of P2 ~ H P1 where P2 and P1 consist of (y, x, 1)
+        point = np.matrix(( point[1], point[0], 1 ))
+        if whichImage == 1:
+            corres_pt = H * point.T
+        else:
+            corres_pt = np.linalg.inv(H) * point.T
+
+        # Note that the point is in homogeneous coordinate
+        corres_pt = corres_pt / corres_pt[2]
+
+        return (float(corres_pt[1]), float(corres_pt[0]))
